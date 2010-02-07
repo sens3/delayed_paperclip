@@ -1,4 +1,3 @@
-
 require File.expand_path(File.join(File.dirname(__FILE__), 'spec_helper'))
 require File.expand_path(File.join(File.dirname(__FILE__), '../lib/delayed_paperclip'))
 
@@ -80,7 +79,7 @@ describe "DelayedPaperclip" do
     @post.stub!(:id).and_return(1)
     @post.stub!(:new_record?).and_return(false)
     
-    # the file that was uploaded from the user
+    # the file that was uploaded by the user
     @uploaded_file_path = File.expand_path(File.join(File.dirname(__FILE__), "files/wurst.jpg"))
     uploaded_file = File.new(@uploaded_file_path)
     
@@ -104,7 +103,6 @@ describe "DelayedPaperclip" do
     @post.save
     File.exist?(@post.tmp_path).should be_true
   end
-
 
   it "should stop paperclip from uploading files when saving" do
     @post.should_not_receive(:save_attached_files_without_interrupt)
