@@ -41,6 +41,25 @@ module DelayedPaperclip
    
   module InstanceMethods
     
+    def perform
+      logger.info("performing delayed job for #{self.class} #{self.id}.")
+      self.pending = false
+
+      f = File.open(tmp_path)
+      attachment.queued_for_write[:original] = f
+      success = (attachment.reprocess! and self.save)
+      f.close
+
+      if success
+        logger.info "successfully processed #{self.class} #{self.id}"
+        File.delete(tmp_path)
+        logger.info "deleting tmp file at #{tmp_path}"
+      else
+        logger.error "Problems while executing 'perform' for #{self.class} #{self.id}"
+      end  
+      success
+    end
+    
     def save_file_locally
       logger.info "saving file at #{tmp_path}"
       File.open(tmp_path, 'w+') { |f| f.write(self.send(attachment_name).queued_for_write[:original].read) }
@@ -59,13 +78,17 @@ module DelayedPaperclip
       self.class.attachment_definitions.keys.first
     end
     
+    def attachment
+      self.send attachment_name
+    end
+    
     def file_name
       self.send("#{attachment_name}_file_name")
     end
     
     def tmp_path
       raise "Cant use tmp_path for unsaved object" if self.new_record?
-      File.join(options[:tmp_dir], "#{self.id}-#{file_name}")
+      File.join(options[:tmp_dir], "#{self.class}-#{self.id}-#{attachment_name}-#{file_name}")
     end
     
     def job_class

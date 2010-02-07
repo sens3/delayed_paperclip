@@ -3,6 +3,8 @@ DelayedPaperclip
 
 If you want to load "Paperclip":http://github.com/thoughtbot/paperclip processing off to "Delayed_job":http://github.com/tobi/delayed_job/
 
+* stores uploaded file to the given directory 
+* enqueues an instance of the given Job class at the DJ job queue. Job instances are per default created with the object id only. If you need more you can overwrite the _enqueue_new_job_ method in your model.
 
 Example
 =======

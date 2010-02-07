@@ -2,7 +2,7 @@
 require File.expand_path(File.join(File.dirname(__FILE__), 'spec_helper'))
 require File.expand_path(File.join(File.dirname(__FILE__), '../lib/delayed_paperclip'))
 
-class PostJob < Struct.new(:image_id)
+class PostImageJob < Struct.new(:image_id)
   def perform
   end
 end
@@ -67,36 +67,44 @@ describe "DelayedPaperclip" do
   
   before(:each) do
     @good_dir = File.expand_path(File.join(File.dirname(__FILE__), "tmp/images")) 
-    @good_class_name = "PostJob"
+    @good_class_name = "PostImageJob"
     @logger = mock('logger')
     @logger.stub!(:info)
+    @logger.stub!(:error)
     
     Post.has_attached_file :image
     Post.delay_paperclip :tmp_dir => @good_dir, :job_class => @good_class_name
     
     @post = Post.new
+    @post.stub!(:pending=)
     @post.stub!(:id).and_return(1)
     @post.stub!(:new_record?).and_return(false)
-        
-    uploaded_file = File.new(File.expand_path(File.join(File.dirname(__FILE__), "tmp/file_uploads/wurst.jpg")))
-    @data = mock(Object)
-    @data.stub!(:queued_for_write).and_return({:original => uploaded_file })
+    
+    # the file that was uploaded from the user
+    @uploaded_file_path = File.expand_path(File.join(File.dirname(__FILE__), "files/wurst.jpg"))
+    uploaded_file = File.new(@uploaded_file_path)
+    
+    @attachment = mock(Object)
+    @attachment.stub!(:reprocess!).and_return(true)
+    @attachment.stub!(:queued_for_write).and_return({:original => uploaded_file })
 
-    @post.stub!(:image).and_return(@data)
+    @post.stub!(:image).and_return(@attachment)
     @post.stub!(:image_file_name).and_return("wurst.jpg")
     @post.stub(:logger).and_return(@logger)
   end
   
   # TODO: why does this one fail if its not first or in a describe block?
+
   it "should enqueue new job after create" do
-    Delayed::Job.should_receive(:enqueue).with(an_instance_of(PostJob))
+    Delayed::Job.should_receive(:enqueue).with(an_instance_of(PostImageJob))
     @post.save
   end
-      
+    
   it "should save file locally after create" do
     @post.save
     File.exist?(@post.tmp_path).should be_true
   end
+
 
   it "should stop paperclip from uploading files when saving" do
     @post.should_not_receive(:save_attached_files_without_interrupt)
@@ -105,6 +113,76 @@ describe "DelayedPaperclip" do
   
   it "should find attachment_name" do
     @post.attachment_name.should == :image
+  end
+  
+  describe "looking up tmp path" do
+    
+    it "should raise error if object is not saved yet" do
+      @post.stub!(:new_record?).and_return(true)
+      lambda { @post.tmp_path }.should raise_error("Cant use tmp_path for unsaved object")
+    end
+    
+    it "should construct tmp path" do
+      @post.tmp_path.should == "#{@good_dir}/Post-1-image-wurst.jpg"
+    end
+    
+  end
+  
+  describe "performing job" do
+    
+    before do
+      @tmp_path = '/the-file'
+      @post.stub!(:tmp_path).and_return(@tmp_path)
+      @file = mock('file')
+      @file.stub!(:close)
+      File.stub!(:open).and_return(@file)
+      File.stub!(:delete)
+    end
+    
+    it "should open the tmp file" do
+      File.should_receive(:open).with(@tmp_path)
+      @post.perform
+    end
+  
+    it "should mark object as not pending" do
+      @post.should_receive(:pending=).with(false)
+      @post.perform
+    end
+    
+    it "should assign the tmp file to the paperclip variable" do
+      queued = mock('queued for write')
+      @attachment.stub!(:queued_for_write).and_return(queued)
+      queued.should_receive(:[]=).with(:original, @file)
+      @post.perform
+    end
+    
+    it "should trigger paperclips re-processing" do
+      @attachment.should_receive(:reprocess!)
+      @post.perform
+    end
+    
+    it "should save the object" do
+      @post.should_receive(:save)
+      @post.perform
+    end
+    
+    it "should close the file" do
+      @file.should_receive(:close)
+      @post.perform
+    end
+    
+    describe "when successful" do
+      
+      before do
+        @attachment.stub!(:reprocess!).and_return(true)
+        @post.stub!(:save).and_return(true)
+      end
+      
+      it "should delete tmp file" do
+        File.should_receive(:delete).with(@tmp_path)
+        @post.perform
+      end
+    end
   end
   
   describe "validate options" do
