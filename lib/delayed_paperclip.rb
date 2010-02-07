@@ -59,9 +59,13 @@ module DelayedPaperclip
       self.class.attachment_definitions.keys.first
     end
     
+    def file_name
+      self.send("#{attachment_name}_file_name")
+    end
+    
     def tmp_path
       raise "Cant use tmp_path for unsaved object" if self.new_record?
-      File.join(options[:tmp_dir], "/#{self.id}-#{self.data_file_name}")
+      File.join(options[:tmp_dir], "#{self.id}-#{file_name}")
     end
     
     def job_class
