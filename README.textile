@@ -8,11 +8,9 @@ If you want to load "Paperclip":http://github.com/thoughtbot/paperclip processin
 
 h2. Example
 
-@
-class Post
+@class Post
   has_attached_file :image
   delay_paperclip :tmp_dir => "#{RAILS_ROOT}/tmp/images", :job_class => 'ImageJob'
-end
-@
+end@
 
 Copyright (c) 2009 Simon Baumgartner, released under the MIT license
