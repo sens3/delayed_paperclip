@@ -83,9 +83,12 @@ describe "DelayedPaperclip" do
     @uploaded_file_path = File.expand_path(File.join(File.dirname(__FILE__), "files/wurst.jpg"))
     uploaded_file = File.new(@uploaded_file_path)
     
+    @queued = {:original => uploaded_file }
+    @queued.stub!(:[]=)
+    
     @attachment = mock(Object)
     @attachment.stub!(:reprocess!).and_return(true)
-    @attachment.stub!(:queued_for_write).and_return({:original => uploaded_file })
+    @attachment.stub!(:queued_for_write).and_return(@queued)
 
     @post.stub!(:image).and_return(@attachment)
     @post.stub!(:image_file_name).and_return("wurst.jpg")
@@ -133,7 +136,9 @@ describe "DelayedPaperclip" do
       @post.stub!(:tmp_path).and_return(@tmp_path)
       @file = mock('file')
       @file.stub!(:close)
-      File.stub!(:open).and_return(@file)
+      @file.stub!(:read)
+      @file.stub!(:write)
+      File.stub!(:open).and_yield(@file)
       File.stub!(:delete)
     end
     
@@ -148,9 +153,7 @@ describe "DelayedPaperclip" do
     end
     
     it "should assign the tmp file to the paperclip variable" do
-      queued = mock('queued for write')
-      @attachment.stub!(:queued_for_write).and_return(queued)
-      queued.should_receive(:[]=).with(:original, @file)
+      @queued.should_receive(:[]=).with(:original, @file)
       @post.perform
     end
     
@@ -161,11 +164,6 @@ describe "DelayedPaperclip" do
     
     it "should save the object" do
       @post.should_receive(:save)
-      @post.perform
-    end
-    
-    it "should close the file" do
-      @file.should_receive(:close)
       @post.perform
     end
     

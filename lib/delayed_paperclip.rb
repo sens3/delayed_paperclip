@@ -45,10 +45,10 @@ module DelayedPaperclip
       logger.info("performing delayed job for #{self.class} #{self.id}.")
       self.pending = false
 
-      f = File.open(tmp_path)
-      attachment.queued_for_write[:original] = f
-      success = (attachment.reprocess! and self.save)
-      f.close
+      success = File.open(tmp_path) do |f|
+        attachment.queued_for_write[:original] = f
+        attachment.reprocess! and self.save
+      end
 
       if success
         logger.info "successfully processed #{self.class} #{self.id}"
