@@ -1,9 +1,7 @@
 module DelayedPaperclip
   
-  class <<self
-    def included base
-      base.extend ClassMethods
-    end
+  def self.included(base)
+    base.extend ClassMethods
   end
   
   class InvalidOptionError < StandardError #:nodoc:
@@ -13,10 +11,11 @@ module DelayedPaperclip
 
     def delay_paperclip(options = {})      
       include InstanceMethods
+
+      define_callbacks :after_perform_with_success, :after_perform_without_success
             
       after_create :save_file_locally
       after_create :enqueue_new_job
-      
       define_method :options do
         options
       end
@@ -40,7 +39,7 @@ module DelayedPaperclip
   end
    
   module InstanceMethods
-    
+
     def perform
       logger.info("performing delayed job for #{self.class} #{self.id}.")
       self.pending = false
@@ -52,21 +51,25 @@ module DelayedPaperclip
 
       if success
         logger.info "successfully processed #{self.class} #{self.id}"
+        callback(:after_perform_with_success)
         File.delete(tmp_path)
         logger.info "deleting tmp file at #{tmp_path}"
       else
+        callback(:after_perform_without_success)
         logger.error "Problems while executing 'perform' for #{self.class} #{self.id}"
       end  
       success
     end
     
     def save_file_locally
-      logger.info "saving file at #{tmp_path}"
-      File.open(tmp_path, 'w+') { |f| f.write(self.send(attachment_name).queued_for_write[:original].read) }
+      if self.pending?
+        logger.info "saving file at #{tmp_path}"
+        File.open(tmp_path, 'w+') { |f| f.write(self.send(attachment_name).queued_for_write[:original].read) }
+      end
     end
     
     def enqueue_new_job
-      Delayed::Job.enqueue job_class.new(self.id)
+      Delayed::Job.enqueue(job_class.new(self.id)) if self.pending?
     end
     
     def save_attached_files_with_interrupt
