@@ -52,7 +52,19 @@ module ActiveRecord
       end
       true
     end
-
+    
+    def self.define_callbacks(*args)
+    end
+    
+    attr_accessor :pending
+    
+    def pending?
+      true
+    end
+    
+    def callback(arg)
+    end
+    
     def self.alias_method_chain(original, topping)
     end
     
