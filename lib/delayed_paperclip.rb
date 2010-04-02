@@ -21,7 +21,7 @@ module DelayedPaperclip
       end
       
       validate_options options
-      
+      options[:tmp_dir] = File.expand_path(options[:tmp_dir])
       FileUtils.mkdir_p options[:tmp_dir]
       alias_method_chain :save_attached_files, :interrupt
     end
